@@ -21,7 +21,7 @@
   <div class="card"><h3>Departures</h3><table id="dep"></table></div>
 </div>
 <script>
-const API = 'YOUR_EXEC_URL';
+const API = 'https://script.google.com/macros/s/AKfycbyMsXImK1LNG7VnfkdYMk8s8sSuQyzcP9C5bJcvEcYOpOtXHjREAchqeqlg26tdCtu7fA/exec';
 const fmt = ts => ts ? new Date(ts*1000).toLocaleString('en-GB',
   {timeZone:'Asia/Colombo',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}) : '-';
 const render = (id, rows, label) => {
