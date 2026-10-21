@@ -1,174 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BIA Live Flight Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIA Colombo – Flights</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}
+  header{padding:16px 24px;background:#1e293b}
+  .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;padding:16px}
+  .card{background:#1e293b;border-radius:10px;padding:12px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #334155}
+  small{color:#94a3b8}
+</style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
-  
-  <!-- Header Navbar -->
-  <header class="bg-slate-800 border-b border-slate-700 shadow-md px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-    <div class="flex items-center space-x-3">
-      <div class="bg-blue-600 p-2 rounded-lg text-white font-bold text-xl">✈️</div>
-      <div>
-        <h1 class="text-xl font-bold tracking-wide">BIA Live Flight Radar</h1>
-        <p class="text-xs text-slate-400">Bandaranaike International Airport (CMB / VCBI)</p>
-      </div>
-    </div>
-    
-    <div class="flex items-center gap-3">
-      <input type="text" id="searchInput" placeholder="Search flight or airline..." 
-        class="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg text-sm focus:outline-none focus:border-blue-500 w-64"
-        onkeyup="filterFlights()">
-      
-      <button onclick="loadData()" id="refreshBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 cursor-pointer">
-        <span>🔄 Refresh</span>
-      </button>
-    </div>
-  </header>
-
-  <!-- Main Content Layout -->
-  <main class="max-w-7xl mx-auto p-6">
-    
-    <!-- Navigation Tabs -->
-    <div class="flex border-b border-slate-700 mb-6">
-      <button id="tabArrivals" onclick="switchTab('arrivals')" class="px-6 py-3 font-semibold text-blue-400 border-b-2 border-blue-400 focus:outline-none transition cursor-pointer">
-        📥 Arrivals
-      </button>
-      <button id="tabDepartures" onclick="switchTab('departures')" class="px-6 py-3 font-semibold text-slate-400 hover:text-slate-200 focus:outline-none transition cursor-pointer">
-        📤 Departures
-      </button>
-    </div>
-
-    <!-- Status Banner / Loading Spinner -->
-    <div id="loading" class="text-center py-20">
-      <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
-      <p class="mt-4 text-slate-400 text-sm">Fetching real-time data from Flightradar24 via Apps Script API...</p>
-    </div>
-
-    <div id="errorContainer" class="hidden bg-red-900/50 border border-red-700 text-red-200 p-4 rounded-lg mb-6"></div>
-
-    <!-- Flight Table Container -->
-    <div id="tableContainer" class="hidden overflow-x-auto rounded-xl border border-slate-700 shadow-xl bg-slate-800">
-      <table class="w-full text-left border-collapse">
-        <thead>
-          <tr class="bg-slate-700/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700">
-            <th class="p-4">Time</th>
-            <th class="p-4">Flight</th>
-            <th class="p-4">Airline</th>
-            <th class="p-4" id="originDestHeader">Origin</th>
-            <th class="p-4">Aircraft</th>
-            <th class="p-4">Status</th>
-          </tr>
-        </thead>
-        <tbody id="flightTableBody" class="divide-y divide-slate-700 text-sm">
-          <!-- Dynamically Injected Rows -->
-        </tbody>
-      </table>
-    </div>
-  </main>
-
-  <script>
-    // Paste your deployed Google Apps Script Web App URL here
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyMsXImK1LNG7VnfkdYMk8s8sSuQyzcP9C5bJcvEcYOpOtXHjREAchqeqlg26tdCtu7fA/exec";
-
-    let currentMode = 'arrivals';
-    let flightDataCache = [];
-
-    window.onload = function() {
-      loadData();
-    };
-
-    function switchTab(mode) {
-      currentMode = mode;
-      document.getElementById('tabArrivals').className = mode === 'arrivals' 
-        ? 'px-6 py-3 font-semibold text-blue-400 border-b-2 border-blue-400 focus:outline-none transition cursor-pointer' 
-        : 'px-6 py-3 font-semibold text-slate-400 hover:text-slate-200 focus:outline-none transition cursor-pointer';
-      
-      document.getElementById('tabDepartures').className = mode === 'departures' 
-        ? 'px-6 py-3 font-semibold text-blue-400 border-b-2 border-blue-400 focus:outline-none transition cursor-pointer' 
-        : 'px-6 py-3 font-semibold text-slate-400 hover:text-slate-200 focus:outline-none transition cursor-pointer';
-      
-      document.getElementById('originDestHeader').innerText = mode === 'arrivals' ? 'Origin' : 'Destination';
-      loadData();
-    }
-
-    async function loadData() {
-      document.getElementById('loading').classList.remove('hidden');
-      document.getElementById('tableContainer').classList.add('hidden');
-      document.getElementById('errorContainer').classList.add('hidden');
-
-      try {
-        // redirect: "follow" is required because Google Apps Script responds with a 302 Redirect
-        const response = await fetch(`${GAS_WEB_APP_URL}?mode=${currentMode}`, {
-          method: 'GET',
-          redirect: 'follow'
-        });
-        
-        const result = await response.json();
-
-        if (!result.success) {
-          showError(result.error || 'Failed to retrieve flight data');
-          return;
-        }
-
-        flightDataCache = result.data;
-        renderTable(flightDataCache);
-        document.getElementById('tableContainer').classList.remove('hidden');
-
-      } catch (err) {
-        showError(err.message || 'Error communicating with Google Apps Script');
-      } finally {
-        document.getElementById('loading').classList.add('hidden');
-      }
-    }
-
-    function showError(message) {
-      const errDiv = document.getElementById('errorContainer');
-      errDiv.innerText = 'Error loading flights: ' + message;
-      errDiv.classList.remove('hidden');
-    }
-
-    function renderTable(flights) {
-      const tbody = document.getElementById('flightTableBody');
-      tbody.innerHTML = '';
-
-      if (flights.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">No flights found.</td></tr>`;
-        return;
-      }
-
-      flights.forEach(f => {
-        let badgeColor = 'bg-slate-700 text-slate-300';
-        if (f.statusType === 'green') badgeColor = 'bg-emerald-900/60 text-emerald-300 border border-emerald-700';
-        else if (f.statusType === 'amber' || f.statusType === 'yellow') badgeColor = 'bg-amber-900/60 text-amber-300 border border-amber-700';
-        else if (f.statusType === 'red') badgeColor = 'bg-rose-900/60 text-rose-300 border border-rose-700';
-
-        const row = document.createElement('tr');
-        row.className = 'hover:bg-slate-700/30 transition';
-        row.innerHTML = `
-          <td class="p-4 font-mono text-slate-300">${f.time}</td>
-          <td class="p-4 font-bold text-blue-400">${f.flightNumber}</td>
-          <td class="p-4 text-slate-200">${f.airline}</td>
-          <td class="p-4 text-slate-300">${f.airport}</td>
-          <td class="p-4 text-slate-400 text-xs">${f.aircraft}</td>
-          <td class="p-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold ${badgeColor}">${f.status}</span></td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-
-    function filterFlights() {
-      const query = document.getElementById('searchInput').value.toLowerCase();
-      const filtered = flightDataCache.filter(f => 
-        f.flightNumber.toLowerCase().includes(query) || 
-        f.airline.toLowerCase().includes(query) || 
-        f.airport.toLowerCase().includes(query)
-      );
-      renderTable(filtered);
-    }
-  </script>
+<body>
+<header><h2>Bandaranaike Intl (CMB)</h2><small id="upd">Loading…</small></header>
+<div class="wrap">
+  <div class="card"><h3>Arrivals</h3><table id="arr"></table></div>
+  <div class="card"><h3>Departures</h3><table id="dep"></table></div>
+</div>
+<script>
+const API = 'YOUR_EXEC_URL';
+const fmt = ts => ts ? new Date(ts*1000).toLocaleString('en-GB',
+  {timeZone:'Asia/Colombo',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'}) : '-';
+const render = (id, rows, label) => {
+  document.getElementById(id).innerHTML =
+    `<tr><th>Flight</th><th>${label}</th><th>Time</th><th>Status</th></tr>` +
+    rows.map(r => `<tr><td>${r.flight||'-'}</td><td>${r.city||'-'} (${r.code||''})</td>
+      <td>${fmt(r.scheduled)}</td><td>${r.status||'-'}</td></tr>`).join('');
+};
+async function load(){
+  try{
+    const d = await (await fetch(API)).json();
+    render('arr', d.arrivals, 'From');
+    render('dep', d.departures, 'To');
+    document.getElementById('upd').textContent = 'Updated ' + new Date(d.updated).toLocaleTimeString();
+  }catch(e){ document.getElementById('upd').textContent = 'Failed to load data'; }
+}
+load(); setInterval(load, 300000);
+</script>
 </body>
 </html>
